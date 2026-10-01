@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI/CD Runner Security</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f4f6;
+            color: #1f2937;
+        }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 240px;
+            background: #111827;
+            color: white;
+            padding: 24px 16px;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            padding-left: 10px;
+        }
+
+        .menu-item {
+            padding: 12px 14px;
+            border-radius: 7px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .menu-item:hover,
+        .menu-item.active {
+            background: #2563eb;
+        }
+
+        .main {
+            flex: 1;
+        }
+
+        .topbar {
+            background: white;
+            padding: 18px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .topbar h2 {
+            margin: 0 0 5px 0;
+        }
+
+        .runner-status {
+            background: #dcfce7;
+            color: #166534;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .metric-card,
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+
+        .metric-title {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            margin-top: 8px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            margin-bottom: 20px;
+        }
+
+        .panel h3 {
+            margin-top: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+        }
+
+        th {
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .status-ok {
+            color: #15803d;
+            font-weight: bold;
+        }
+
+        .status-warning {
+            color: #ca8a04;
+            font-weight: bold;
+        }
+
+        .status-danger {
+            color: #dc2626;
+            font-weight: bold;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 16px;
+            border-radius: 7px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+        }
+
+        .tab.active {
+            background: #2563eb;
+            color: white;
+            border-color: #2563eb;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .progress {
+            background: #e5e7eb;
+            height: 10px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 7px 0 16px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #2563eb;
+        }
+
+        .button {
+            padding: 10px 16px;
+            border: 0;
+            border-radius: 7px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background: #1d4ed8;
+        }
+
+        .input {
+            padding: 10px;
+            width: 100%;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+
+        .event {
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .event-time {
+            font-size: 12px;
+            color: #9ca3af;
+        }
+
+        .message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 7px;
+            background: #dcfce7;
+            color: #166534;
+            display: none;
+        }
+
+        @media (max-width: 1000px) {
+            .metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="layout">
+
+    <aside class="sidebar">
+
+        <div class="logo">Runner Security</div>
+
+        <div class="menu-item active" data-section="overview">
+            Обзор
+        </div>
+
+        <div class="menu-item" data-section="runner">
+            Runner
+        </div>
+
+        <div class="menu-item" data-section="analysis">
+            Анализ заданий
+        </div>
+
+        <div class="menu-item" data-section="secrets">
+            Секреты
+        </div>
+
+        <div class="menu-item" data-section="events">
+            События
+        </div>
+
+        <div class="menu-item" data-section="policies">
+            Политики
+        </div>
+
+        <div class="menu-item" data-section="settings">
+            Настройки
+        </div>
+
+    </aside>
+
+    <main class="main">
+
+        <div class="topbar">
+
+            <div>
+                <h2 id="page-title">Панель безопасности CI/CD Runner</h2>
+                <small id="page-description">
+                    Мониторинг и анализ CI/CD заданий
+                </small>
+            </div>
+
+            <div class="runner-status">
+                Runner Online
+            </div>
+
+        </div>
+
+        <div class="content">
+
+            <!-- ОБЗОР -->
+
+            <section id="overview" class="section active">
+
+                <div class="tabs">
+
+                    <div class="tab active" data-tab="overview-day">
+                        Последние 24 часа
+                    </div>
+
+                    <div class="tab" data-tab="overview-week">
+                        7 дней
+                    </div>
+
+                    <div class="tab" data-tab="overview-jobs">
+                        Последние задания
+                    </div>
+
+                </div>
+
+                <div id="overview-day" class="tab-content active">
+
+                    <div class="metrics">
+
+                        <div class="metric-card">
+                            <div class="metric-title">Выполнено заданий</div>
+                            <div class="metric-value">128</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-title">Успешных</div>
+                            <div class="metric-value">119</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-title">Предупреждений</div>
+                            <div class="metric-value">7</div>
+                        </div>
+
+                        <div class="metric-card">
+                            <div class="metric-title">Заблокировано</div>
+                            <div class="metric-value">2</div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div id="overview-week" class="tab-content">
+
+                    <div class="panel">
+
+                        <h3>Статистика за 7 дней</h3>
+
+                        <p>Всего заданий: <strong>814</strong></p>
+                        <p>Успешных: <strong>782</strong></p>
+                        <p>Предупреждений: <strong>25</strong></p>
+                        <p>Заблокировано: <strong>7</strong></p>
+
+                    </div>
+
+                </div>
+
+                <div id="overview-jobs" class="tab-content">
+
+                    <div class="panel">
+
+                        <h3>Последние CI/CD задания</h3>
+
+                        <table>
+
+                            <tr>
+                                <th>ID</th>
+                                <th>Проект</th>
+                                <th>Этап</th>
+                                <th>Риск</th>
+                                <th>Статус</th>
+                            </tr>
+
+                            <tr>
+                                <td>#1048</td>
+                                <td>backend-service</td>
+                                <td>deploy</td>
+                                <td>Низкий</td>
+                                <td class="status-ok">Успешно</td>
+                            </tr>
+
+                            <tr>
+                                <td>#1047</td>
+                                <td>web-client</td>
+                                <td>build</td>
+                                <td>Средний</td>
+                                <td class="status-warning">Проверка</td>
+                            </tr>
+
+                            <tr>
+                                <td>#1046</td>
+                                <td>api-gateway</td>
+                                <td>deploy</td>
+                                <td>Высокий</td>
+                                <td class="status-danger">Заблокировано</td>
+                            </tr>
+
+                        </table>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- RUNNER -->
+
+            <section id="runner" class="section">
+
+                <div class="grid">
+
+                    <div class="panel">
+
+                        <h3>Состояние Runner</h3>
+
+                        <p><strong>Имя:</strong> runner-01</p>
+                        <p><strong>Executor:</strong> Docker</p>
+                        <p><strong>Версия:</strong> 1.0.0</p>
+                        <p><strong>Статус:</strong> <span class="status-ok">Online</span></p>
+                        <p><strong>Активных заданий:</strong> 3</p>
+
+                    </div>
+
+                    <div class="panel">
+
+                        <h3>Ресурсы</h3>
+
+                        <p>CPU: 43%</p>
+
+                        <div class="progress">
+                            <div class="progress-bar" style="width:43%"></div>
+                        </div>
+
+                        <p>RAM: 61%</p>
+
+                        <div class="progress">
+                            <div class="progress-bar" style="width:61%"></div>
+                        </div>
+
+                        <p>Disk: 37%</p>
+
+                        <div class="progress">
+                            <div class="progress-bar" style="width:37%"></div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- АНАЛИЗ -->
+
+            <section id="analysis" class="section">
+
+                <div class="panel">
+
+                    <h3>Анализ CI/CD задания</h3>
+
+                    <input
+                        class="input"
+                        id="jobInput"
+                        placeholder="Введите ID задания, например #1047"
+                    >
+
+                    <button class="button" onclick="analyseJob()">
+                        Выполнить анализ
+                    </button>
+
+                    <div id="analysisResult" class="message"></div>
+
+                </div>
+
+                <div class="panel">
+
+                    <h3>Проверяемые параметры</h3>
+
+                    <p>Проверка команд Pipeline</p>
+                    <p>Контроль использования секретов</p>
+                    <p>Анализ привилегий Runner</p>
+                    <p>Проверка сетевой активности</p>
+                    <p>Контроль запуска контейнеров</p>
+
+                </div>
+
+            </section>
+
+            <!-- СЕКРЕТЫ -->
+
+            <section id="secrets" class="section">
+
+                <div class="panel">
+
+                    <h3>Хранилище секретов</h3>
+
+                    <table>
+
+                        <tr>
+                            <th>Имя</th>
+                            <th>Тип</th>
+                            <th>Последнее использование</th>
+                            <th>Статус</th>
+                        </tr>
+
+                        <tr>
+                            <td>GIT_TOKEN</td>
+                            <td>Token</td>
+                            <td>2 мин назад</td>
+                            <td class="status-ok">Активен</td>
+                        </tr>
+
+                        <tr>
+                            <td>DB_PASSWORD</td>
+                            <td>Password</td>
+                            <td>15 мин назад</td>
+                            <td class="status-ok">Активен</td>
+                        </tr>
+
+                        <tr>
+                            <td>DEPLOY_KEY</td>
+                            <td>SSH Key</td>
+                            <td>1 час назад</td>
+                            <td class="status-warning">Требует ротации</td>
+                        </tr>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+            <!-- СОБЫТИЯ -->
+
+            <section id="events" class="section">
+
+                <div class="panel">
+
+                    <h3>Журнал событий</h3>
+
+                    <div class="event">
+                        <strong>Pipeline успешно завершён</strong>
+                        <div class="event-time">20:41</div>
+                    </div>
+
+                    <div class="event">
+                        <strong>Обнаружено использование секрета</strong>
+                        <div class="event-time">20:36</div>
+                    </div>
+
+                    <div class="event">
+                        <strong>Задание отправлено на анализ</strong>
+                        <div class="event-time">20:31</div>
+                    </div>
+
+                    <div class="event">
+                        <strong>Опасное задание заблокировано</strong>
+                        <div class="event-time">20:15</div>
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- ПОЛИТИКИ -->
+
+            <section id="policies" class="section">
+
+                <div class="panel">
+
+                    <h3>Политики безопасности</h3>
+
+                    <p>
+                        <input type="checkbox" checked>
+                        Запрет privileged-контейнеров
+                    </p>
+
+                    <p>
+                        <input type="checkbox" checked>
+                        Контроль секретов
+                    </p>
+
+                    <p>
+                        <input type="checkbox" checked>
+                        Изоляция заданий
+                    </p>
+
+                    <p>
+                        <input type="checkbox">
+                        Блокировать задания со средним риском
+                    </p>
+
+                    <button class="button" onclick="savePolicy()">
+                        Сохранить политики
+                    </button>
+
+                    <div id="policyMessage" class="message">
+                        Политики успешно сохранены
+                    </div>
+
+                </div>
+
+            </section>
+
+            <!-- НАСТРОЙКИ -->
+
+            <section id="settings" class="section">
+
+                <div class="panel">
+
+                    <h3>Настройки Runner</h3>
+
+                    <label>Имя Runner</label>
+
+                    <input
+                        class="input"
+                        value="runner-01"
+                    >
+
+                    <label>Максимум параллельных заданий</label>
+
+                    <input
+                        class="input"
+                        type="number"
+                        value="4"
+                    >
+
+                    <label>Executor</label>
+
+                    <select class="input">
+                        <option>Docker</option>
+                        <option>Shell</option>
+                        <option>Kubernetes</option>
+                    </select>
+
+                    <button class="button" onclick="saveSettings()">
+                        Сохранить настройки
+                    </button>
+
+                    <div id="settingsMessage" class="message">
+                        Настройки успешно сохранены
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </main>
+
+</div>
+
+<script>
+
+    const menuItems = document.querySelectorAll('.menu-item');
+    const sections = document.querySelectorAll('.section');
+
+    const pageTitle = document.getElementById('page-title');
+    const pageDescription = document.getElementById('page-description');
+
+    const titles = {
+        overview: ['Панель безопасности CI/CD Runner', 'Мониторинг и анализ CI/CD заданий'],
+        runner: ['Состояние Runner', 'Информация о работе CI/CD агента'],
+        analysis: ['Анализ заданий', 'Проверка CI/CD заданий на потенциальные угрозы'],
+        secrets: ['Секреты', 'Контроль ключей, токенов и паролей'],
+        events: ['События безопасности', 'Журнал действий CI/CD Runner'],
+        policies: ['Политики безопасности', 'Настройка правил выполнения CI/CD заданий'],
+        settings: ['Настройки', 'Конфигурация CI/CD Runner']
+    };
+
+    menuItems.forEach(item => {
+
+        item.addEventListener('click', function () {
+
+            menuItems.forEach(i => i.classList.remove('active'));
+            sections.forEach(s => s.classList.remove('active'));
+
+            this.classList.add('active');
+
+            const sectionId = this.dataset.section;
+
+            document
+                .getElementById(sectionId)
+                .classList.add('active');
+
+            pageTitle.textContent = titles[sectionId][0];
+            pageDescription.textContent = titles[sectionId][1];
+
+        });
+
+    });
+
+    const tabs = document.querySelectorAll('.tab');
+
+    tabs.forEach(tab => {
+
+        tab.addEventListener('click', function () {
+
+            const parent = this.closest('.section');
+
+            parent
+                .querySelectorAll('.tab')
+                .forEach(t => t.classList.remove('active'));
+
+            parent
+                .querySelectorAll('.tab-content')
+                .forEach(c => c.classList.remove('active'));
+
+            this.classList.add('active');
+
+            document
+                .getElementById(this.dataset.tab)
+                .classList.add('active');
+
+        });
+
+    });
+
+    function analyseJob() {
+
+        const input = document.getElementById('jobInput');
+        const result = document.getElementById('analysisResult');
+
+        if (input.value.trim() === '') {
+
+            result.style.display = 'block';
+            result.style.background = '#fee2e2';
+            result.style.color = '#991b1b';
+            result.textContent = 'Введите ID задания';
+
+            return;
+        }
+
+        result.style.display = 'block';
+        result.style.background = '#dcfce7';
+        result.style.color = '#166534';
+
+        result.innerHTML =
+            '<strong>Анализ завершён.</strong><br>' +
+            'Задание: ' + input.value +
+            '<br>Уровень риска: низкий' +
+            '<br>Критических нарушений не обнаружено.';
+
+    }
+
+    function savePolicy() {
+
+        document
+            .getElementById('policyMessage')
+            .style.display = 'block';
+
+    }
+
+    function saveSettings() {
+
+        document
+            .getElementById('settingsMessage')
+            .style.display = 'block';
+
+    }
+
+</script>
+
+</body>
+</html>
